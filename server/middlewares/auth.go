@@ -1,132 +1,83 @@
 package middlewares
 
 import (
-    "net/http"
-    "os"
+	"net/http"
+	"os"
+	"server/models"
 
-    "github.com/gin-gonic/gin"
-    "github.com/golang-jwt/jwt/v5"
+	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
 )
 
 var jwtKey = []byte(os.Getenv("JWT_SECRET"))
 
 func Auth() gin.HandlerFunc {
-    return func(c *gin.Context) {
-        authHeader := c.GetHeader("Authorization")
-        if authHeader == "" {
-            c.JSON(401, gin.H{"error": "Token required"})
-            c.Abort()
-            return
-        }
+	return func(c *gin.Context) {
+        
+		tokenString, err := c.Cookie("token")
+		if err != nil {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Token required"})
+			c.Abort()
+			return
+		}
 
-        tokenString := authHeader[len("Bearer "):]
+		claims := &models.Claims{}
 
-        token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-            return jwtKey, nil
-        })
+		token, err := jwt.ParseWithClaims(
+			tokenString,
+			claims,
+			func(token *jwt.Token) (interface{}, error) {
+				return jwtKey, nil
+			},
+		)
 
-        if err != nil || !token.Valid {
-            c.JSON(401, gin.H{"error": "Invalid token"})
-            c.Abort()
-            return
-        }
+		if err != nil || !token.Valid {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid or expired token"})
+			c.Abort()
+			return
+		}
+        
+		c.Set("userid", claims.UserId)
+		c.Set("role", claims.Role)
 
-        claims := token.Claims.(jwt.MapClaims)
-        c.Set("role", claims["role"])
-        c.Next()
-    }
+		c.Next()
+	}
 }
 
-func IsAdmin() gin.HandlerFunc{
-    return func(c *gin.Context){
-        authHeader := c.GetHeader("Authorization")
+func IsAdmin() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		role, exists := c.Get("role")
 
-        if authHeader == "" {
-            c.JSON(http.StatusUnauthorized,gin.H{"error":"Token Not Found"})
-            c.Abort()
-            return
-        }
+		if !exists || role != "admin" {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Access Denied"})
+			c.Abort()
+			return
+		}
 
-        tokenString := authHeader[len("Bearer "):]        
-
-        token ,err := jwt.Parse(tokenString,func(token *jwt.Token)(interface{},error){
-            if _,ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-                return nil,jwt.ErrSignatureInvalid
-            }
-            return jwtKey,nil
-        })
-
-        if err!=nil || !token.Valid {
-            c.JSON(http.StatusUnauthorized,gin.H{"error":"Invalid Token or Token Expired "})
-            c.Abort()
-            return
-        }
-
-        claims, ok := token.Claims.(jwt.MapClaims)
-
-        if !ok {
-            c.JSON(http.StatusUnauthorized,gin.H{"error":"Invalid Token Claims"})
-            c.Abort()
-            return 
-        }
-
-        if claims["role"] != "admin" {
-            c.JSON(http.StatusUnauthorized,gin.H{"error":"Access Denied"})
-            c.Abort()
-            return 
-        }
-
-        c.Next()
-    }
+		c.Next()
+	}
 }
-func IsSuperAdmin() gin.HandlerFunc{
-    return func(c *gin.Context){
-        authHeader := c.GetHeader("Authorization")
 
-        if authHeader == "" {
-            c.JSON(http.StatusUnauthorized,gin.H{"error":"Token Not Found"})
-            c.Abort()
-            return
-        }
+func IsSuperAdmin() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		role, exists := c.Get("role")
 
-        tokenString := authHeader[len("Bearer "):]        
+		if !exists || role != "superadmin" {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Access Denied"})
+			c.Abort()
+			return
+		}
 
-        token ,err := jwt.Parse(tokenString,func(token *jwt.Token)(interface{},error){
-            if _,ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-                return nil,jwt.ErrSignatureInvalid
-            }
-            return jwtKey,nil
-        })
-
-        if err!=nil || !token.Valid {
-            c.JSON(http.StatusUnauthorized,gin.H{"error":"Invalid Token or Token Expired "})
-            c.Abort()
-            return
-        }
-
-        claims, ok := token.Claims.(jwt.MapClaims)
-
-        if !ok {
-            c.JSON(http.StatusUnauthorized,gin.H{"error":"Invalid Token Claims"})
-            c.Abort()
-            return 
-        }
-
-        if claims["role"] != "superadmin" {
-            c.JSON(http.StatusUnauthorized,gin.H{"error":"Access Denied"})
-            c.Abort()
-            return 
-        }
-
-        c.Next()
-    }
+		c.Next()
+	}
 }
+
 func AdminOrSuperAdmin() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		role, exists := c.Get("role")
 
 		if !exists || (role != "admin" && role != "superadmin") {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Access Denied"})
+			c.JSON(http.StatusForbidden, gin.H{"error": "Access Denied"})
 			c.Abort()
 			return
 		}

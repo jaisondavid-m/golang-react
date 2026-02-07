@@ -37,7 +37,7 @@ func Login(c *gin.Context){
 		return
 	}
 
-	expirationIime:=time.Now().Add(72*time.Hour)
+	expirationIime:=time.Now().Add(3*time.Hour)
 	claims := &models.Claims{
 		UserId: User.UserId,
 		Role:   User.Role,
@@ -54,10 +54,17 @@ func Login(c *gin.Context){
 		return
 	}
 
-	c.JSON(http.StatusOK,gin.H{
-		"message":"Logged In Successfully",
-		"token":tokenstring,
-	})
+	c.SetCookie(
+		"token",
+		tokenstring,
+		3*60*60,
+		"/",
+		"localhost",
+		false,
+		true,
+	)
+
+	c.JSON(http.StatusOK,gin.H{"message":"Logged In Successfully"})
 }
 
 func Register(c *gin.Context){

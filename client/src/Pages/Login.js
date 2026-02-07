@@ -13,7 +13,6 @@ function Login() {
         setError("");
         try {
             const res =await api.post("/login",{userid,password})
-            localStorage.setItem("token", res.data.token);
             setMessage(res.data.message)
         } catch (err) {
             setError(err.response?.data?.error || "Login failed")
